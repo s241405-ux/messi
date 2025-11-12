@@ -1,0 +1,434 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+</script>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鍵盤控制戰鬥機避障遊戲</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
+        #gameArea { position: relative; width: 400px; height: 400px; margin: 20px auto; background: #eee; border: 2px solid #333; overflow: hidden; }
+        #car { position: absolute; width: 50px; height: 50px; background: url('https://png.pngtree.com/png-clipart/20211010/original/pngtree-air-force-fighter-cartoon-black-png-image_6850953.png') no-repeat center center; background-size: contain; transition: all 0.1s ease; left: 175px; top: 185px; }
+        .obstacle { position: absolute; width: 20px; height: 20px; background: blue; border-radius: 50%; }
+        .bullet { position: absolute; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid red; }
+        button { padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        #status { color: blue; margin: 10px; }
+        #score { font-size: 20px; margin: 10px; }
+        #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; color: red; display: none; }
+        #bulletStatus { position: absolute; top: 20px; right: 20px; font-size: 16px; color: black; }
+        #upgradePanel { position: absolute; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.9); padding: 10px; border: 1px solid #333; display: none; }
+        #upgradePanel button { display: block; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>鍵盤控制戰鬥機避障遊戲</h1>
+    <p>使用上下左右鍵控制戰鬥機移動，按 Z 鍵發射子彈，選擇升級增強能力！</p>
+
+    <!-- 遊戲區域 -->
+    <div id="gameArea">
+        <div id="car"></div>
+        <div id="gameOver">Game Over!</div>
+        <div id="bulletStatus">子彈: 10/10</div>
+        <div id="upgradePanel">
+            <h3>選擇升級</h3>
+            <button onclick="upgradeFireRate()">射速加快 0.3 倍</button>
+            <button onclick="upgradeReloadTime()">補充子彈時間加快 0.3 倍</button>
+            <button onclick="upgradeBurstCount()">連發子彈數 +1</button>
+        </div>
+    </div>
+
+    <!-- 計分 -->
+    <div id="score">分數: 0</div>
+
+    <!-- 控制按鈕 -->
+    <button onclick="toggleGame()">開始/停止遊戲</button>
+    <div id="status">狀態：遊戲尚未開始</div>
+
+    <script>
+        let car = { x: 175, y: 185, dx: 0, dy: 0, maxSpeed: 5 };
+        let obstacles = [];
+        let bullets = [];
+        let gameRunning = false;
+        let score = 0;
+        let gameOver = false;
+        let bulletCount = 10;
+        let maxBullets = 10;
+        let reloadTime = 3000; // 3秒
+        let isReloading = false;
+        let lastShotTime = 0;
+        let fireRate = 300; // 射擊間隔（毫秒）
+        let burstCount = 1; // 每次射擊子彈數
+        let obstacleInterval = 1000; // 初始障礙物生成間隔
+        let lastUpgradeScore = 0;
+
+        const gameArea = document.getElementById('gameArea');
+        const carEl = document.getElementById('car');
+        const gameOverEl = document.getElementById('gameOver');
+        const statusEl = document.getElementById('status');
+        const scoreEl = document.getElementById('score');
+        const bulletStatusEl = document.getElementById('bulletStatus');
+        const upgradePanelEl = document.getElementById('upgradePanel');
+
+        // 鍵盤控制
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, KeyZ: false };
+
+        document.addEventListener('keydown', (event) => {
+            if (event.code in keys) {
+                keys[event.code] = true;
+                event.preventDefault(); // 防止頁面滾動
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.code in keys) {
+                keys[event.code] = false;
+            }
+        });
+
+        // 更新戰鬥機速度
+        function updateCarSpeed() {
+            car.dx = 0;
+            car.dy = 0;
+            if (keys.ArrowLeft) car.dx = -car.maxSpeed;
+            if (keys.ArrowRight) car.dx = car.maxSpeed;
+            if (keys.ArrowUp) car.dy = -car.maxSpeed;
+            if (keys.ArrowDown) car.dy = car.maxSpeed;
+            if (keys.KeyZ) shootBullet();
+        }
+
+        // 計算三角形內積
+        function dotProduct(ax, ay, bx, by) {
+            return ax * bx + ay * by;
+        }
+
+        // 判斷點是否在三角形內
+        function isPointInTriangle(px, py, ax, ay, bx, by, cx, cy) {
+            const v0x = cx - ax;
+            const v0y = cy - ay;
+            const v1x = bx - ax;
+            const v1y = by - ay;
+            const v2x = px - ax;
+            const v2y = py - ay;
+
+            const dot00 = dotProduct(v0x, v0y, v0x, v0y);
+            const dot01 = dotProduct(v0x, v0y, v1x, v1y);
+            const dot02 = dotProduct(v0x, v0y, v2x, v2y);
+            const dot11 = dotProduct(v1x, v1y, v1x, v1y);
+            const dot12 = dotProduct(v1x, v1y, v2x, v2y);
+
+            const invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+            const u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+            const v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+            return (u >= 0) && (v >= 0) && (u + v < 1);
+        }
+
+        // 發射子彈
+        function shootBullet() {
+            if (gameRunning && !gameOver && !isReloading) {
+                const currentTime = Date.now();
+                if (currentTime - lastShotTime < fireRate) return;
+                if (bulletCount >= burstCount) {
+                    for (let i = 0; i < burstCount; i++) {
+                        let bullet = {
+                            x: car.x + 22.5 + (i - (burstCount - 1) / 2) * 10,
+                            y: car.y - 10,
+                            speed: -5,
+                            el: document.createElement('div')
+                        };
+                        bullet.el.className = 'bullet';
+                        bullet.el.style.left = bullet.x + 'px';
+                        bullet.el.style.top = bullet.y + 'px';
+                        gameArea.appendChild(bullet.el);
+                        bullets.push(bullet);
+                    }
+                    bulletCount -= burstCount;
+                    lastShotTime = currentTime;
+                    updateBulletStatus();
+                    if (bulletCount <= 0) {
+                        startReload();
+                    }
+                }
+            }
+        }
+
+        // 開始補充子彈
+        function startReload() {
+            isReloading = true;
+            let startTime = Date.now();
+            let reloadInterval = setInterval(() => {
+                let elapsed = Date.now() - startTime;
+                let remaining = Math.max(0, (reloadTime - elapsed) / 1000).toFixed(1);
+                bulletStatusEl.textContent = `補充中: ${remaining}秒`;
+                if (elapsed >= reloadTime) {
+                    clearInterval(reloadInterval);
+                    bulletCount = maxBullets;
+                    isReloading = false;
+                    updateBulletStatus();
+                }
+            }, 100);
+        }
+
+        // 更新子彈狀態顯示
+        function updateBulletStatus() {
+            if (!isReloading) {
+                bulletStatusEl.textContent = `子彈: ${bulletCount}/${maxBullets}`;
+            }
+        }
+
+        // 升級選項
+        function upgradeFireRate() {
+            fireRate *= 0.7;
+            hideUpgradePanel();
+            gameRunning = true;
+            statusEl.textContent = '遊戲繼續！射速提升！';
+        }
+
+        function upgradeReloadTime() {
+            reloadTime *= 0.7;
+            hideUpgradePanel();
+            gameRunning = true;
+            statusEl.textContent = '遊戲繼續！補充時間縮短！';
+        }
+
+        function upgradeBurstCount() {
+            burstCount += 1;
+            hideUpgradePanel();
+            gameRunning = true;
+            statusEl.textContent = '遊戲繼續！連發子彈數增加！';
+        }
+
+        function showUpgradePanel() {
+            gameRunning = false;
+            upgradePanelEl.style.display = 'block';
+            statusEl.textContent = '請選擇一個升級！';
+        }
+
+        function hideUpgradePanel() {
+            upgradePanelEl.style.display = 'none';
+            lastUpgradeScore = score;
+        }
+
+        // 切換遊戲狀態
+        function toggleGame() {
+            gameRunning = !gameRunning;
+            gameOver = false;
+            gameOverEl.style.display = 'none';
+            upgradePanelEl.style.display = 'none';
+            if (gameRunning) {
+                score = 0;
+                bulletCount = maxBullets;
+                isReloading = false;
+                obstacleInterval = 1000;
+                lastUpgradeScore = 0;
+                updateScore();
+                updateBulletStatus();
+                obstacles.forEach(obs => obs.el.remove());
+                bullets.forEach(bullet => bullet.el.remove());
+                obstacles = [];
+                bullets = [];
+                statusEl.textContent = '遊戲開始！使用上下左右鍵移動，Z鍵射擊';
+                resetObstacleInterval();
+            } else {
+                statusEl.textContent = '遊戲暫停';
+            }
+        }
+
+        // 更新戰鬥機位置
+        function updateCarPosition() {
+            updateCarSpeed(); // 根據鍵盤輸入更新速度
+            car.x += car.dx;
+            car.y += car.dy;
+            if (car.x < 0) car.x = 0;
+            if (car.x > 350) car.x = 350;
+            if (car.y < 0) car.y = 0;
+            if (car.y > 350) car.y = 350;
+            carEl.style.left = car.x + 'px';
+            carEl.style.top = car.y + 'px';
+        }
+
+        // 生成障礙物
+        function createObstacle() {
+            if (gameRunning && !gameOver) {
+                let obs = { x: Math.random() * 380, y: 0, speed: 3, el: document.createElement('div') };
+                obs.el.className = 'obstacle';
+                obs.el.style.left = obs.x + 'px';
+                obs.el.style.top = obs.y + 'px';
+                gameArea.appendChild(obs.el);
+                obstacles.push(obs);
+            }
+        }
+
+        // 重設障礙物生成間隔
+        let obstacleTimer = null;
+        function resetObstacleInterval() {
+            if (obstacleTimer) clearInterval(obstacleTimer);
+            obstacleTimer = setInterval(createObstacle, obstacleInterval);
+        }
+
+        // 更新子彈和碰撞檢測
+        function updateBullets() {
+            if (gameRunning && !gameOver) {
+                bullets.forEach((bullet, bulletIndex) => {
+                    bullet.y += bullet.speed;
+                    bullet.el.style.top = bullet.y + 'px';
+                    if (bullet.y < 0) {
+                        bullet.el.remove();
+                        bullets.splice(bulletIndex, 1);
+                        return;
+                    }
+                    // 子彈與障礙物碰撞檢測
+                    obstacles.forEach((obs, obsIndex) => {
+                        if (bullet.y < obs.y + 20 && bullet.y + 10 > obs.y &&
+                            bullet.x < obs.x + 20 && bullet.x + 10 > obs.x) {
+                            bullet.el.remove();
+                            obs.el.remove();
+                            bullets.splice(bulletIndex, 1);
+                            obstacles.splice(obsIndex, 1);
+                            score += 5;
+                            updateScore();
+                        }
+                    });
+                    // 子彈與戰鬥機三角形 hitbox 碰撞檢測
+                    if (isPointInTriangle(bullet.x + 5, bullet.y + 10,
+                        car.x + 25, car.y,
+                        car.x, car.y + 50,
+                        car.x + 50, car.y + 50)) {
+                        bullet.el.remove();
+                        bullets.splice(bulletIndex, 1);
+                    }
+                });
+            }
+        }
+
+        // 更新障礙物和碰撞檢測
+        function updateObstacles() {
+            if (gameRunning && !gameOver) {
+                obstacles.forEach((obs, index) => {
+                    obs.y += obs.speed;
+                    obs.el.style.top = obs.y + 'px';
+                    if (obs.y > 400) {
+                        obs.el.remove();
+                        obstacles.splice(index, 1);
+                        score++;
+                        updateScore();
+                    }
+                    // 障礙物與戰鬥機三角形 hitbox 碰撞檢測
+                    if (isPointInTriangle(obs.x + 10, obs.y + 10,
+                        car.x + 25, car.y,
+                        car.x, car.y + 50,
+                        car.x + 50, car.y + 50)) {
+                        gameOver = true;
+                        gameRunning = false;
+                        gameOverEl.style.display = 'block';
+                        statusEl.textContent = `遊戲結束！最終分數: ${score}`;
+                    }
+                });
+            }
+        }
+
+        // 更新分數並檢查升級與生成速度
+        function updateScore() {
+            scoreEl.textContent = `分數: ${score}`;
+            // 每100分，障礙物生成速度加快0.5倍
+            if (Math.floor(score / 100) > Math.floor((score - 1) / 100)) {
+                obstacleInterval *= 0.5;
+                resetObstacleInterval();
+            }
+            // 每200分，顯示升級面板
+            if (score >= lastUpgradeScore + 200 && score > 0) {
+                showUpgradePanel();
+            }
+        }
+
+        // 遊戲迴圈 (每 50ms 更新)
+        setInterval(() => {
+            updateCarPosition();
+            updateObstacles();
+            updateBullets();
+        }, 50);
+
+        // 初始障礙物生成
+        resetObstacleInterval();
+    </script>
+</body>
+</html>
